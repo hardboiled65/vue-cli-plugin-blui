@@ -1,0 +1,36 @@
+<template lang="blui">
+  <Window title="Sample" instance="main_window">
+    <Menu type="MenuBarMenu">
+      <MenuItem title="File">
+        <Menu type="Submenu" title="File">
+          <MenuItem title="New Text File">
+          </MenuItem>
+        </Menu>
+      </MenuItem>
+      <MenuItem title="Edit">
+        <Menu type="Submenu" title="Edit">
+          <MenuItem title="Delete">
+          </MenuItem>
+        </Menu>
+      </MenuItem>
+      <MenuItem title="Help">
+        <Menu type="Submenu" title="Help">
+          <MenuItem title="Handbook">
+          </MenuItem>
+          <MenuItem title="About">
+          </MenuItem>
+        </Menu>
+      </MenuItem>
+    </Menu>
+    <Toolbar>
+      <Button title="Up">
+      </Button>
+      <Button title="New Folder">
+      </Button>
+      <SegmentedControl>
+      </SegmentedControl>
+    </Toolbar>
+    <Button title="Test" instance="test_button">
+    </Button>
+  </Window>
+</template>
