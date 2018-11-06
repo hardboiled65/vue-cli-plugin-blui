@@ -1,9 +1,15 @@
 <template lang="blui">
   <Window title="Sample" instance="main_window">
-    <Menu type="MenuBarMenu">
+    <Menu type="MenuBarMenu" instance="main_menu">
       <MenuItem title="File">
         <Menu type="Submenu" title="File">
-          <MenuItem title="New Text File">
+          <MenuItem title="New Folder">
+          </MenuItem>
+          <MenuItem title="New File">
+            <Menu type="Submenu" title="New File">
+              <MenuItem title="New Text File">
+              </MenuItem>
+            </Menu>
           </MenuItem>
         </Menu>
       </MenuItem>
@@ -23,12 +29,18 @@
       </MenuItem>
     </Menu>
     <Toolbar>
-      <Button title="Up">
-      </Button>
-      <Button title="New Folder">
-      </Button>
-      <SegmentedControl>
-      </SegmentedControl>
+      <ToolbarItem label="Up">
+        <Button title="Up">
+        </Button>
+      </ToolbarItem>
+      <ToolbarItem label="New Folder">
+        <Button title="New Folder">
+        </Button>
+      </ToolbarItem>
+      <ToolbarItem label="Move">
+        <SegmentedControl>
+        </SegmentedControl>
+      </ToolbarItem>
     </Toolbar>
     <Button title="Test" instance="test_button">
     </Button>
