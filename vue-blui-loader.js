@@ -1,9 +1,9 @@
-const Blui = require('blui')
+const Blui = require('./blui.js')
 const { toCamelCase, indent, Instance } = require('./utils.js')
 
 function getTemplate(source) {
   let match = /<template(.|\n)*<\/template>/[Symbol.match](source)
-  if (match.length === 0) {
+  if (!match) {
     console.warn('No <template> tag.')
   }
   return match[0]
@@ -15,7 +15,7 @@ function isBluiTemplate(template) {
 
 function getScript(source) {
   let match = /<script>(.|\n)*<\/script>/[Symbol.match](source)
-  if (match.length === 0) {
+  if (!match) {
     console.warn('No <script> tag.')
   }
   return match[0]
@@ -23,7 +23,7 @@ function getScript(source) {
 
 function getStyle(source) {
   let match = /<style(.|\n)*<\/style>/[Symbol.match](source)
-  if (match.length === 0) {
+  if (!match) {
     return ''
   }
   return match[0]
