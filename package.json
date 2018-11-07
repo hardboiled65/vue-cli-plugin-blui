@@ -1,7 +1,7 @@
 {
   "name": "vue-cli-plugin-blui",
   "version": "0.0.1",
-  "description": "",
+  "description": "vue blui loader",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -9,6 +9,6 @@
   "devDependencies": {
     "libxmljs": "^0.19.5"
   },
-  "author": "",
-  "license": "ISC"
+  "author": "hardboiled65",
+  "license": "MIT"
 }
