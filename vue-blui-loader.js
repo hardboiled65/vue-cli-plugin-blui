@@ -1,5 +1,5 @@
 const Blui = require('blui')
-const { toCamelCase, indent } = require('./utils.js')
+const { toCamelCase, indent, Instance } = require('./utils.js')
 
 function getTemplate(source) {
   let match = /<template(.|\n)*<\/template>/[Symbol.match](source)
@@ -21,24 +21,42 @@ function getScript(source) {
   return match[0]
 }
 
+function getStyle(source) {
+  let match = /<style(.|\n)*<\/style>/[Symbol.match](source)
+  if (match.length === 0) {
+    return ''
+  }
+  return match[0]
+}
+
 const instanceMap = {
   'Window': {
     need: true,
     class: 'ApplicationWindow',
-    args: ['type'],
+    args: [{ key: 'type', type: 'const' }],
+    inits: [{ key: 'title', type: 'string' }],
+    const: {
+      type: 'ApplicationWindow.WindowType'
+    },
     component: 'bl-window'
   },
   'Menu': {
     need: true,
     class: 'Menu',
-    args: ['type'],
+    args: [
+      { key: 'type', type: 'const' },
+      { key: 'title', type: 'string', optional: true }
+    ],
+    const: {
+      type: 'Menu.MenuType'
+    },
     component: 'bl-menu',
     slot: 'menuBar'
   },
   'MenuItem': {
     need: false,
     class: 'MenuItem',
-    args: ['title']
+    args: [{ key: 'title', type: 'string' }]
   },
   'Toolbar': {
     need: false,
@@ -53,7 +71,7 @@ const instanceMap = {
   'Button': {
     need: true,
     class: 'Button',
-    args: ['title'],
+    args: [{ key: 'title', type: 'string' }],
     component: 'bl-button'
   },
   'SegmentedControl': {
@@ -147,7 +165,74 @@ function bluiToVueTemplate(blui) {
 // Extract scripts
 //=========================
 
-function menuInitializer(menuNode) {
+function instanceInitializer(node, name) {
+  const map = instanceMap[node.className]
+  let instance = new Instance(name, map.class)
+  let code = `// Init ${name}: ${map.class}.\n`
+  // Create instance with arguments.
+  let args = []
+  if (map.args) {
+    map.args.forEach(arg => {
+      if (arg.type === 'const') {
+        args.push(map.const[arg.key] + '.' + node.attributes[arg.key])
+      } else if (arg.type === 'string') {
+        args.push(`'${node.attributes[arg.key]}'`)
+      }
+    })
+  }
+  code += instance.new(args)
+  // Initialize instance with attributes.
+  if (map.inits) {
+    map.inits.forEach(init => {
+      if (init.type === 'string') {
+        code += instance.assign(init.key, node.attributes[init.key])
+      }
+    })
+  }
+
+  return code
+}
+
+function menuStructureBuilder(blui, menuNode) {
+  let space = 0
+  let code = ''
+  blui.traverse(
+    menuNode,
+    node => {
+      if (node !== menuNode) {
+        code += `${indent(space)}{\n`
+        space += 2
+        let name = node.className === 'Menu' ? '_submenu' : '_menuItem'
+        let instance = new Instance(name, node.className)
+        let args = node.className === 'Menu'
+          ? ['Menu.MenyType.Submenu', `'${node.attributes['title']}'`]
+          : [`'${node.attributes['title']}'`]
+        code += `${indent(space)}${instance.letNew(args)}`
+      }
+    },
+    node => {
+      if (node !== menuNode) {
+        if (node.children.length === 0) {
+          code += `${indent(space)}_submenu.items.push(_menuItem);\n`
+        }
+        if (node.children.length > 0 &&
+            node.className === 'Menu') {
+          code += `${indent(space)}_menuItem.submenu = _submenu;\n`
+        } else if (node.children.length > 0 &&
+            node.className === 'MenuItem') {
+          if (node.parent !== menuNode) {
+            code += `${indent(space)}_submenu.items.push(_menuItem);\n`
+          } else {
+            const instanceName = toCamelCase(menuNode.attributes['instance'])
+            code += `${indent(space)}${instanceName}.items.push(_menuItem);\n`
+          }
+        }
+        space -= 2
+        code += `${indent(space)}}\n`
+      }
+    })
+
+  return code
 }
 
 /**
@@ -173,7 +258,8 @@ function extractFromBlui(blui) {
             : `rt${rtId++}`
           instances.push({
             name: instanceName,
-            init: `this.${instanceName} = new ${map.class}();`
+            init: instanceInitializer(node, instanceName),
+            menu: (node.className === 'Menu') ? menuStructureBuilder(blui, node) : ''
           })
           if (node.className === 'Menu') {
             skip = true
@@ -208,16 +294,16 @@ function extractFromBlui(blui) {
       instances.forEach(instanceInfo => {
         instanceNames.push(instanceInfo.name)
       })
-      return `data() {
-  return {
-${instanceNames.reduce((acc, cur) => (`${acc}    ${cur}: null,\n`), '')}
-  };
-},`
+      return 'data() {\n'
+        + '  return {\n'
+        + `${instanceNames.reduce((acc, cur) => (`${acc}    ${cur}: null,\n`), '')}`
+        + '  };\n'
+        + '},\n'
     })(),
     created: (() => {
       let inits = []
       instances.forEach(instanceInfo => {
-        inits.push(instanceInfo.init)
+        inits.push(instanceInfo.init + instanceInfo.menu)
       })
       return inits.join('\n')
     })(),
@@ -232,24 +318,31 @@ module.exports = function(source, map, meta) {
   if (!isBluiTemplate(template)) {
     return source
   }
+  let vue = {
+    template: null,
+    script: null,
+    style: null
+  }
   //=====================
   // .blui template
   //=====================
   const blui = new Blui(template)
   console.log(bluiToVueTemplate(blui))
-  let result = '<!-- loaded by vue-blui-loader -->\n' + template
-  result = result.replace('<Window', '<bl-window')
-  result = result.replace('</Window', '</bl-window')
+  vue.template = bluiToVueTemplate(blui)
 
   //=====================
   // vue script
   //=====================
   const script = getScript(source)
-  if (/type=script/.test(this.resourceQuery)) {
-    console.log('-- script --');
-    let result = source.replace('PRINT', 'console.log')
-    console.log(result)
-    return result
-  }
-  return result
+  const scriptParts = extractFromBlui(blui)
+  console.log(scriptParts)
+  vue.script = script
+
+  //=====================
+  // style
+  //=====================
+  vue.style = getStyle(source)
+
+  // Merge and return.
+  return vue.template + '\n' + vue.script + '\n' + vue.style + '\n'
 }

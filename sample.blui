@@ -1,5 +1,5 @@
 <template lang="blui">
-  <Window title="Sample" instance="main_window">
+  <Window type="MainWindow" title="Sample" instance="main_window">
     <Menu type="MenuBarMenu" instance="main_menu">
       <MenuItem title="File">
         <Menu type="Submenu" title="File">

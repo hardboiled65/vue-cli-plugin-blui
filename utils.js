@@ -11,7 +11,27 @@ function indent(space) {
   return ' '.repeat(space)
 }
 
+class Instance {
+  constructor(name, cls) {
+    this.name = name
+    this.class = cls
+  }
+
+  new(args) {
+    return `this.${this.name} = new ${this.class}(${args.join(', ')});\n`
+  }
+
+  letNew(args) {
+    return `let ${this.name} = new ${this.class}(${args.join(', ')});\n`
+  }
+
+  assign(key, value) {
+    return `this.${this.name}.${key} = ${value};\n`
+  }
+}
+
 module.exports = {
   toCamelCase,
   indent,
+  Instance,
 }
