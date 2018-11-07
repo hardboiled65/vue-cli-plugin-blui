@@ -30,11 +30,11 @@
     </Menu>
     <Toolbar>
       <ToolbarItem label="Up">
-        <Button title="Up">
+        <Button type="PushButton" title="Up">
         </Button>
       </ToolbarItem>
       <ToolbarItem label="New Folder">
-        <Button title="New Folder">
+        <Button type="PushButton" title="New Folder">
         </Button>
       </ToolbarItem>
       <ToolbarItem label="Move">
@@ -42,7 +42,7 @@
         </SegmentedControl>
       </ToolbarItem>
     </Toolbar>
-    <Button title="Test" instance="test_button">
+    <Button type="PushButton" title="Test" instance="test_button">
     </Button>
   </Window>
 </template>

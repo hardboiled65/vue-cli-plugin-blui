@@ -71,7 +71,13 @@ const instanceMap = {
   'Button': {
     need: true,
     class: 'Button',
-    args: [{ key: 'title', type: 'string' }],
+    args: [
+      { key: 'type', type: 'const' },
+      { key: 'title', type: 'string' }
+    ],
+    const: {
+      type: 'Button.ButtonType'
+    },
     component: 'bl-button'
   },
   'SegmentedControl': {
@@ -185,7 +191,7 @@ function instanceInitializer(node, name) {
   if (map.inits) {
     map.inits.forEach(init => {
       if (init.type === 'string') {
-        code += instance.assign(init.key, node.attributes[init.key])
+        code += instance.assign(init.key, `'${node.attributes[init.key]}'`)
       }
     })
   }
@@ -205,7 +211,7 @@ function menuStructureBuilder(blui, menuNode) {
         let name = node.className === 'Menu' ? '_submenu' : '_menuItem'
         let instance = new Instance(name, node.className)
         let args = node.className === 'Menu'
-          ? ['Menu.MenyType.Submenu', `'${node.attributes['title']}'`]
+          ? ['Menu.MenuType.Submenu', `'${node.attributes['title']}'`]
           : [`'${node.attributes['title']}'`]
         code += `${indent(space)}${instance.letNew(args)}`
       }
@@ -224,7 +230,7 @@ function menuStructureBuilder(blui, menuNode) {
             code += `${indent(space)}_submenu.items.push(_menuItem);\n`
           } else {
             const instanceName = toCamelCase(menuNode.attributes['instance'])
-            code += `${indent(space)}${instanceName}.items.push(_menuItem);\n`
+            code += `this.${indent(space)}${instanceName}.items.push(_menuItem);\n`
           }
         }
         space -= 2
@@ -248,9 +254,11 @@ function extractFromBlui(blui) {
     null,
     node => {
       const map = instanceMap[node.className]
-      if (map.need) {
-        // Add to import set.
+      // Add to import set.
+      if (map.need || map.class === 'MenuItem') {
         importSet.add(map.class)
+      }
+      if (map.need) {
         // Get instance info.
         if (!skip) {
           const instanceName = (node.attributes['instance'])
@@ -305,7 +313,9 @@ function extractFromBlui(blui) {
       instances.forEach(instanceInfo => {
         inits.push(instanceInfo.init + instanceInfo.menu)
       })
-      return inits.join('\n')
+      return 'created() {'
+        + inits.join('\n')
+        + '},\n'
     })(),
   }
 }
@@ -333,10 +343,12 @@ module.exports = function(source, map, meta) {
   //=====================
   // vue script
   //=====================
-  const script = getScript(source)
+  let script = getScript(source)
   const scriptParts = extractFromBlui(blui)
-  console.log(scriptParts)
+  script = script.replace('<script>', '<script>\n' + scriptParts.imports)
+  script = script.replace('mixins: []', 'mixins:[{' + scriptParts.data + scriptParts.created + '}]')
   vue.script = script
+  console.log(vue.script)
 
   //=====================
   // style
