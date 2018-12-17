@@ -321,13 +321,14 @@ function extractFromBlui(blui) {
 }
 
 module.exports = function(source, map, meta) {
-  console.log('\n== vue-blui-loader ==')
-  console.log(this.resource)
-
   const template = getTemplate(source)
   if (!isBluiTemplate(template)) {
     return source
   }
+
+  console.log('\n== vue-blui-loader ==')
+  console.log(this.resource)
+
   let vue = {
     template: null,
     script: null,
