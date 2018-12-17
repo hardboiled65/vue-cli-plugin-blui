@@ -1,6 +1,9 @@
 const Blui = require('./blui.js')
 const { toCamelCase, indent, Instance } = require('./utils.js')
 
+const path = require('path')
+const fs = require('fs')
+
 function getTemplate(source) {
   let match = /<template(.|\n)*<\/template>/[Symbol.match](source)
   if (!match) {
@@ -328,6 +331,12 @@ module.exports = function(source, map, meta) {
 
   console.log('\n== vue-blui-loader ==')
   console.log(this.resource)
+  if (/\.vue$/.test(this.resource) === false) {
+    return source
+  }
+
+  // Debug output.
+  fs.mkdirSync('node_modules/.blui-loader')
 
   let vue = {
     template: null,
@@ -338,8 +347,10 @@ module.exports = function(source, map, meta) {
   // .blui template
   //=====================
   const blui = new Blui(template)
-  console.log(bluiToVueTemplate(blui))
+  // console.log(bluiToVueTemplate(blui))
   vue.template = bluiToVueTemplate(blui)
+  fs.writeFileSync(`node_modules/.blui-loader/${path.basename(this.resource)}.template`,
+    vue.template)
 
   //=====================
   // vue script
@@ -349,7 +360,9 @@ module.exports = function(source, map, meta) {
   script = script.replace('<script>', '<script>\n' + scriptParts.imports)
   script = script.replace('mixins: []', 'mixins:[{' + scriptParts.data + scriptParts.created + '}]')
   vue.script = script
-  console.log(vue.script)
+  // console.log(vue.script)
+  fs.writeFileSync(`node_modules/.blui-loader/${path.basename(this.resource)}.script`,
+    vue.script)
 
   //=====================
   // style
