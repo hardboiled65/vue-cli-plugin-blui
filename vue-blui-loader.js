@@ -1,94 +1,21 @@
 const Blui = require('./blui.js')
-const { toCamelCase, indent, Instance } = require('./utils.js')
+const {
+  toCamelCase,
+  indent,
+  getTemplate,
+  isBluiTemplate,
+  getScript,
+  getExportDefault,
+  isExtends,
+  getStyle,
+  Instance,
+  ViewModel,
+} = require('./utils.js')
+const { instanceMap } = require('./map.js')
 
 const path = require('path')
 const fs = require('fs')
 
-function getTemplate(source) {
-  let match = /<template(.|\n)*<\/template>/[Symbol.match](source)
-  if (!match) {
-    console.warn('No <template> tag.')
-  }
-  return match[0]
-}
-
-function isBluiTemplate(template) {
-  return /lang="blui"/.test(template)
-}
-
-function getScript(source) {
-  let match = /<script>(.|\n)*<\/script>/[Symbol.match](source)
-  if (!match) {
-    console.warn('No <script> tag.')
-  }
-  return match[0]
-}
-
-function getStyle(source) {
-  let match = /<style(.|\n)*<\/style>/[Symbol.match](source)
-  if (!match) {
-    return ''
-  }
-  return match[0]
-}
-
-const instanceMap = {
-  'Window': {
-    need: true,
-    class: 'ApplicationWindow',
-    args: [{ key: 'type', type: 'const' }],
-    inits: [{ key: 'title', type: 'string' }],
-    const: {
-      type: 'ApplicationWindow.WindowType'
-    },
-    component: 'bl-window'
-  },
-  'Menu': {
-    need: true,
-    class: 'Menu',
-    args: [
-      { key: 'type', type: 'const' },
-      { key: 'title', type: 'string', optional: true }
-    ],
-    const: {
-      type: 'Menu.MenuType'
-    },
-    component: 'bl-menu',
-    slot: 'menuBar'
-  },
-  'MenuItem': {
-    need: false,
-    class: 'MenuItem',
-    args: [{ key: 'title', type: 'string' }]
-  },
-  'Toolbar': {
-    need: false,
-    class: 'Toolbar',
-    slot: 'toolbar'
-  },
-  'ToolbarItem': {
-    need: false,
-    props: ['label'],
-    component: 'bl-toolbar-item'
-  },
-  'Button': {
-    need: true,
-    class: 'Button',
-    args: [
-      { key: 'type', type: 'const' },
-      { key: 'title', type: 'string' }
-    ],
-    const: {
-      type: 'Button.ButtonType'
-    },
-    component: 'bl-button'
-  },
-  'SegmentedControl': {
-    need: true,
-    class: 'SegmentedControl',
-    component: 'bl-segmented-control'
-  }
-}
 
 //=========================
 // Extract template
@@ -108,17 +35,19 @@ function bluiToVueTemplate(blui) {
     node => {   // Open Handler
       const map = instanceMap[node.className]
       // Add slot if needed.
-      if (map.slot && !skip) {
+      if (map.slot && !node.parent.extends && !skip) {
         space += 2
         vueTemplate += `${indent(space)}<template slot="${map.slot}">\n`
       }
-      // Add vue component.
+      // Add vue component or html element.
       if (map.component && !skip) {
         space += 2
-        vueTemplate += `${indent(space)}<${map.component}`
+        vueTemplate += (!node.extends)
+          ? `${indent(space)}<${map.component}`
+          : `${indent(space)}<${map.extends.el}`
       }
       // Add instance.
-      if (map.need && !skip) {
+      if (map.need && !node.extends && !skip) {
         const instanceName = (node.attributes['instance'])
           ? toCamelCase(node.attributes['instance'])
           : `rt${rtId++}`
@@ -138,6 +67,9 @@ function bluiToVueTemplate(blui) {
           vueTemplate += `\n${indent(space)}  ${prop}="${node.attributes[prop]}"`
         })
       }
+      if (node.extends) {
+        vueTemplate += `\n${indent(space)}  :class="${map.extends.class}"`
+      }
       // Finish vue component.
       if (map.component && !skip) {
         vueTemplate += '>\n'
@@ -155,13 +87,15 @@ function bluiToVueTemplate(blui) {
           !['Menu', 'MenuItem'].includes(node.parent.className)) {
         skip = false
       }
-      // Close vue component.
+      // Close vue component or html element.
       if (map.component && !skip) {
-        vueTemplate += `${indent(space)}</${map.component}>\n`
+        vueTemplate += (!node.extends)
+          ? `${indent(space)}</${map.component}>\n`
+          : `${indent(space)}</${map.extends.el}>\n`
         space -= 2
       }
       // Close slot if exists.
-      if (map.slot && !skip) {
+      if (map.slot && !node.parent.extends && !skip) {
         vueTemplate += `${indent(space)}</template>\n`
         space -= 2
       }
@@ -175,6 +109,9 @@ function bluiToVueTemplate(blui) {
 //=========================
 
 function instanceInitializer(node, name) {
+  if (node.extends) {
+    name = 'instance'
+  }
   const map = instanceMap[node.className]
   let instance = new Instance(name, map.class)
   let code = `// Init ${name}: ${map.class}.\n`
@@ -189,7 +126,9 @@ function instanceInitializer(node, name) {
       }
     })
   }
-  code += instance.new(args)
+  if (!node.extends) {
+    code += instance.new(args)
+  }
   // Initialize instance with attributes.
   if (map.inits) {
     map.inits.forEach(init => {
@@ -257,21 +196,23 @@ function extractFromBlui(blui) {
     null,
     node => {
       const map = instanceMap[node.className]
-      // Add to import set.
-      if (map.need || map.class === 'MenuItem') {
-        importSet.add(map.class)
-      }
       if (map.need) {
+        // Add to import set.
+        importSet.add(map.class)
         // Get instance info.
         if (!skip) {
           const instanceName = (node.attributes['instance'])
             ? toCamelCase(node.attributes['instance'])
             : `rt${rtId++}`
-          instances.push({
-            name: instanceName,
-            init: instanceInitializer(node, instanceName),
-            menu: (node.className === 'Menu') ? menuStructureBuilder(blui, node) : ''
-          })
+          if (!node.extends) {
+            instances.push({
+              name: instanceName,
+              init: instanceInitializer(node, instanceName),
+              menu: (node.className === 'Menu')
+                ? menuStructureBuilder(blui, node)
+                : '',
+            })
+          }
           if (node.className === 'Menu') {
             skip = true
           }
@@ -343,10 +284,15 @@ module.exports = function(source, map, meta) {
     script: null,
     style: null
   }
+
+  // Gather parts.
+  let script = getScript(source)
+  const extend = isExtends(script)
+
   //=====================
   // .blui template
   //=====================
-  const blui = new Blui(template)
+  const blui = new Blui(template, extend)
   // console.log(bluiToVueTemplate(blui))
   vue.template = bluiToVueTemplate(blui)
   fs.writeFileSync(`node_modules/.blui-loader/${path.basename(this.resource)}.template`,
@@ -355,8 +301,9 @@ module.exports = function(source, map, meta) {
   //=====================
   // vue script
   //=====================
-  let script = getScript(source)
   const scriptParts = extractFromBlui(blui)
+  const viewModelCode = getExportDefault(script)
+  let viewModel = new ViewModel(viewModelCode)
   script = script.replace('<script>', '<script>\n' + scriptParts.imports)
   script = script.replace('mixins: []', 'mixins:[{' + scriptParts.data + scriptParts.created + '}]')
   vue.script = script

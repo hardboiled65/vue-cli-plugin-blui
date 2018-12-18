@@ -32,6 +32,7 @@ class Element {
 class Node {
   constructor() {
     this.parent = null
+    this.extends = false
     this.className = ''
     this.attributes = {}
     this.children = []
@@ -47,11 +48,12 @@ class Blui {
     return Node
   }
 
-  constructor(template) {
+  constructor(template, extend=false) {
     this.version = ''
 
     this._blui = null
     this._template = template
+    this._extends = extend
 
     this._parse(template)
   }
@@ -79,6 +81,7 @@ class Blui {
       newNode.parent = node
       newNode.className = child.tag
       if (node === null) {
+        newNode.extends = this._extends
         this._blui = newNode
       } else {
         node.append(newNode)

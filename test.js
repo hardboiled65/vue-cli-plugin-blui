@@ -1,62 +1,32 @@
 const fs = require('fs')
 const Blui = require('./blui.js')
-const { toCamelCase, indent, Instance } = require('./utils.js')
+const {
+  toCamelCase,
+  indent,
+  getTemplate,
+  isBluiTemplate,
+  getScript,
+  getExportDefault,
+  isExtends,
+  getStyle,
+  Instance,
+  Script,
+  ViewModel,
+} = require('./utils.js')
+const { instanceMap } = require('./map.js')
 
-let sample = fs.readFileSync('sample.blui')
+let sample = fs.readFileSync('sample.vue')
 sample = sample.toString()
 
-let blui = new Blui(sample)
+const template = getTemplate(sample)
+let script = getScript(sample)
+const viewModelCode = getExportDefault(script)
+const extend = isExtends(script)
+
+let blui = new Blui(template, extend)
 console.log(blui.toString())
 console.log('======================================')
 
-const instanceMap = {
-  'Window': {
-    need: true,
-    class: 'ApplicationWindow',
-    args: [{ key: 'type', type: 'const' }],
-    inits: [{ key: 'title', type: 'string' }],
-    const: {
-      type: 'ApplicationWindow.WindowType'
-    },
-    component: 'bl-window'
-  },
-  'Menu': {
-    need: true,
-    class: 'Menu',
-    args: [{ key: 'type', type: 'const' }],
-    const: {
-      type: 'Menu.MenuType'
-    },
-    component: 'bl-menu',
-    slot: 'menuBar'
-  },
-  'MenuItem': {
-    need: false,
-    class: 'MenuItem',
-    args: [{ key: 'title', type: 'string' }]
-  },
-  'Toolbar': {
-    need: false,
-    class: 'Toolbar',
-    slot: 'toolbar'
-  },
-  'ToolbarItem': {
-    need: false,
-    props: ['label'],
-    component: 'bl-toolbar-item'
-  },
-  'Button': {
-    need: true,
-    class: 'Button',
-    args: [{ key: 'title', type: 'string' }],
-    component: 'bl-button'
-  },
-  'SegmentedControl': {
-    need: true,
-    class: 'SegmentedControl',
-    component: 'bl-segmented-control'
-  }
-}
 
 function bluiToVueTemplate(blui) {
   let rtId = 0        // For annonymouse instance.
@@ -69,17 +39,19 @@ function bluiToVueTemplate(blui) {
     node => {   // Open Handler
       const map = instanceMap[node.className]
       // Add slot if needed.
-      if (map.slot && !skip) {
+      if (map.slot && !node.parent.extends && !skip) {
         space += 2
         vueTemplate += `${indent(space)}<template slot="${map.slot}">\n`
       }
-      // Add vue component.
+      // Add vue component or html element.
       if (map.component && !skip) {
         space += 2
-        vueTemplate += `${indent(space)}<${map.component}`
+        vueTemplate += (!node.extends)
+          ? `${indent(space)}<${map.component}`
+          : `${indent(space)}<${map.extends.el}`
       }
       // Add instance.
-      if (map.need && !skip) {
+      if (map.need && !node.extends && !skip) {
         const instanceName = (node.attributes['instance'])
           ? toCamelCase(node.attributes['instance'])
           : `rt${rtId++}`
@@ -99,6 +71,9 @@ function bluiToVueTemplate(blui) {
           vueTemplate += `\n${indent(space)}  ${prop}="${node.attributes[prop]}"`
         })
       }
+      if (node.extends) {
+        vueTemplate += `\n${indent(space)}  :class="${map.extends.class}"`
+      }
       // Finish vue component.
       if (map.component && !skip) {
         vueTemplate += '>\n'
@@ -116,13 +91,15 @@ function bluiToVueTemplate(blui) {
           !['Menu', 'MenuItem'].includes(node.parent.className)) {
         skip = false
       }
-      // Close vue component.
+      // Close vue component or html element.
       if (map.component && !skip) {
-        vueTemplate += `${indent(space)}</${map.component}>\n`
+        vueTemplate += (!node.extends)
+          ? `${indent(space)}</${map.component}>\n`
+          : `${indent(space)}</${map.extends.el}>\n`
         space -= 2
       }
       // Close slot if exists.
-      if (map.slot && !skip) {
+      if (map.slot && !node.parent.extends && !skip) {
         vueTemplate += `${indent(space)}</template>\n`
         space -= 2
       }
@@ -131,7 +108,11 @@ function bluiToVueTemplate(blui) {
   return vueTemplate
 }
 
+
 function instanceInitializer(node, name) {
+  if (node.extends) {
+    name = 'instance'
+  }
   const map = instanceMap[node.className]
   let instance = new Instance(name, map.class)
   let code = `// Init ${name}: ${map.class}.\n`
@@ -146,12 +127,14 @@ function instanceInitializer(node, name) {
       }
     })
   }
-  code += instance.new(args)
+  if (!node.extends) {
+    code += instance.new(args)
+  }
   // Initialize instance with attributes.
   if (map.inits) {
     map.inits.forEach(init => {
       if (init.type === 'string') {
-        code += instance.assign(init.key, node.attributes[init.key])
+        code += instance.assign(init.key, `'${node.attributes[init.key]}'`)
       }
     })
   }
@@ -218,11 +201,15 @@ function extractFromBlui(blui) {
           const instanceName = (node.attributes['instance'])
             ? toCamelCase(node.attributes['instance'])
             : `rt${rtId++}`
-          instances.push({
-            name: instanceName,
-            init: instanceInitializer(node, instanceName),
-            menu: (node.className === 'Menu') ? menuStructureBuilder(blui, node) : ''
-          })
+          if (!node.extends) {
+            instances.push({
+              name: instanceName,
+              init: instanceInitializer(node, instanceName),
+              menu: (node.className === 'Menu')
+                ? menuStructureBuilder(blui, node)
+                : '',
+            })
+          }
           if (node.className === 'Menu') {
             skip = true
           }
@@ -267,14 +254,28 @@ function extractFromBlui(blui) {
       instances.forEach(instanceInfo => {
         inits.push(instanceInfo.init + instanceInfo.menu)
       })
-      return inits.join('\n')
+      return 'created() {'
+        + inits.join('\n')
+        + '},\n'
     })(),
   }
 }
 
 console.log(bluiToVueTemplate(blui))
 
-let script = extractFromBlui(blui)
-console.log(script.imports)
-console.log(script.data)
-console.log(script.created)
+let scriptParts = extractFromBlui(blui)
+
+let viewModel = new ViewModel(viewModelCode)
+// console.log(viewModel._objectExpression.properties[1])
+viewModel.extends = 'BlWindow'
+let mixin = `{${scriptParts.data + scriptParts.created}}`
+// viewModel.pushMixin(`{${scriptParts.data + scriptParts.created}}`)
+let scriptObj = new Script(sample)
+console.log(scriptObj._code)
+// console.log(viewModel._mixinsAst)
+// console.log(viewModel.code)
+
+
+// console.log(scriptParts.imports)
+// console.log(scriptParts.data)
+// console.log(scriptParts.created)

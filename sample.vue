@@ -1,105 +1,57 @@
-<template>
-  <bl-window :instance="mainWindow">
-    <template slot="menuBar">
-      <bl-menu :instance="mainMenu">
-      </bl-menu>
-    </template>
-    <template slot="toolbar">
-      <bl-toolbar-item label="Up">
-        <bl-button>
-        </bl-button>
-      </bl-toolbar-item>
-      <bl-toolbar-item label="New Folder">
-        <bl-button>
-        </bl-button>
-      </bl-toolbar-item>
-      <bl-toolbar-item label="Move">
-        <bl-segmented-control>
-        </bl-segmented-control>
-      </bl-toolbar-item>
-    </template>
-  </bl-window>
+<template lang="blui">
+  <Window type="AppWindow" title="Sample" instance="main_window">
+    <Menu type="MenuBarMenu" instance="main_menu">
+      <MenuItem title="File">
+        <Menu type="Submenu" title="File">
+          <MenuItem title="New Folder">
+          </MenuItem>
+          <MenuItem title="New File">
+            <Menu type="Submenu" title="New File">
+              <MenuItem title="New Text File">
+              </MenuItem>
+            </Menu>
+          </MenuItem>
+        </Menu>
+      </MenuItem>
+      <MenuItem title="Edit">
+        <Menu type="Submenu" title="Edit">
+          <MenuItem title="Delete">
+          </MenuItem>
+        </Menu>
+      </MenuItem>
+      <MenuItem title="Help">
+        <Menu type="Submenu" title="Help">
+          <MenuItem title="Handbook">
+          </MenuItem>
+          <MenuItem title="About">
+          </MenuItem>
+        </Menu>
+      </MenuItem>
+    </Menu>
+    <Toolbar>
+      <ToolbarItem label="Up">
+        <Button type="PushButton" title="Up">
+        </Button>
+      </ToolbarItem>
+      <ToolbarItem label="New Folder">
+        <Button type="PushButton" title="New Folder">
+        </Button>
+      </ToolbarItem>
+      <ToolbarItem label="Move">
+        <SegmentedControl>
+        </SegmentedControl>
+      </ToolbarItem>
+    </Toolbar>
+    <Button type="PushButton" title="Test" instance="test_button">
+    </Button>
+  </Window>
 </template>
 
 <script>
-  //==============================
-  // Imported by vue-blui-loader
-  import {
-    ApplicationWindow,
-    Menu,
-  } from '@hardboiled/vuetk'
-  //
-  //==============================
+  import BlWindow from '@hardboiled65/vuetk/src/components/BlWindow'
 
   export default {
-    mixins: [
-      {
-        data() {
-          return {
-            mainWindow: null,
-            mainMenu: null,
-          };
-        },
-
-        created() {
-          this.mainWindow = new ApplicationWindow(ApplicationWindow.WindowType.MainWindow);
-          this.mainWindow.title = 'Sample';
-
-          this.mainMenu = new Menu(Menu.MenuType.MenuBarMenu);
-          {
-            let _menuItem = new MenuItem('File');
-            {
-              let _submenu = new Menu(Menu.MenuType.Submenu, 'File');
-              {
-                let _menuItem = new MenuItem('New Folder');
-                _submenu.items.push(_menuItem);
-              }
-              {
-                let _menuItem = new MenuItem('New File');
-                {
-                  let _submenu = new Menu(Menu.MenuType.Submenu, 'New File');
-                  {
-                    let _menuItem = new MenuItem('New Text File');
-                    _submenu.items.push(_menuItem);
-                  }
-                  _menuItem.submenu = _submenu;
-                }
-                _submenu.items.push(_menuItem);
-              }
-              _menuItem.submenu = _submenu;
-            }
-            mainMenu.items.push(_menuItem);
-          }
-          {
-            let _menuItem = new MenuItem('Edit');
-            {
-              let _submenu = new Menu(Menu.MenuType.Submenu, 'Edit');
-              {
-                let _menuItem = new MenuItem('Delete');
-                _submenu.items.push(_menuItem);
-              }
-              _menuItem.submenu = _submenu;
-            }
-            mainMenu.items.push(_menuItem);
-          }
-          {
-            let _menuItem = new MenuItem('Help');
-            {
-              let _submenu = new Menu(Menu.MenuType.Submenu, 'Help');
-              {
-                let _menuItem = new MenuItem('Handbook');
-                _submenu.items.push(_menuItem);
-              }
-              {
-                let _menuItem = new MenuItem('About');
-                _submenu.items.push(_menuItem);
-              }
-              _menuItem.submenu = _submenu;
-            }
-            mainMenu.items.push(_menuItem);
-          }
-        }
-      },
-    ],
+    name: 'main-window',
+    // extends: BlWindow,
   }
 </script>
