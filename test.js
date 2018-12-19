@@ -269,11 +269,11 @@ let viewModel = new ViewModel(viewModelCode)
 // console.log(viewModel._objectExpression.properties[1])
 viewModel.extends = 'BlWindow'
 let mixin = `{${scriptParts.data + scriptParts.created}}`
-// viewModel.pushMixin(`{${scriptParts.data + scriptParts.created}}`)
+viewModel.pushMixin(`{${scriptParts.data + scriptParts.created}}`)
 let scriptObj = new Script(sample)
 console.log(scriptObj._code)
 // console.log(viewModel._mixinsAst)
-// console.log(viewModel.code)
+console.log(viewModel.code)
 
 
 // console.log(scriptParts.imports)

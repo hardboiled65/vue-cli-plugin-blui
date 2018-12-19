@@ -158,7 +158,7 @@ class ViewModel {
     let ast = babel.parseSync('var _=' + code)
     const obj = ast.program.body[0].declarations[0].init
     this._mixinsAst.value.elements.push(obj)
-    this._code = generate(this._ast).code
+    this._code = generate(this._mixinsAst).code
   }
 
   get code() {
